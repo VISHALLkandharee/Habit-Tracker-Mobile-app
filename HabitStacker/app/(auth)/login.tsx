@@ -26,7 +26,7 @@ export default function Login() {
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-      <Link href="/auth/signup" asChild>
+      <Link href="/(auth)/signup" asChild>
         <TouchableOpacity style={styles.link}><Text>Don't have an account? Sign Up</Text></TouchableOpacity>
       </Link>
     </View>
