@@ -1,5 +1,12 @@
+import Constants from 'expo-constants';
+
+// Automatically extract the host IP address from Expo bundler connection
+// so mobile devices on Wi-Fi connect to the backend without manual IP edits.
+const hostUri = Constants.expoConfig?.hostUri || (Constants as any).developerLauncher?.manifest?.debuggerHost;
+const hostIp = hostUri ? hostUri.split(':')[0] : '192.168.10.18';
+
 export const CONFIG = {
-  BASE_URL: 'http://192.168.10.23:8000/api', 
+  BASE_URL: `http://${hostIp}:8000/api`,
   TOKEN_KEY: 'user_auth_token',
   REFRESH_TOKEN_KEY: 'user_refresh_token',
 };
@@ -33,4 +40,4 @@ export const SHADOWS = {
   sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
   md: { shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-};
+};
