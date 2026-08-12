@@ -111,22 +111,24 @@ export default function EditHabit() {
     }
 
     setIsSubmitting(true);
+    const hours   = reminderDate.getHours().toString().padStart(2, "0");
+    const minutes = reminderDate.getMinutes().toString().padStart(2, "0");
+    const payload = {
+      title,
+      description,
+      reminderTime: `${hours}:${minutes}`,
+      frequency,
+      targetDays:   frequency === "custom" ? targetDays : [],
+      category,
+      color:        selectedColor,
+      icon:         selectedIcon,
+    };
+
+    // Navigate immediately — editHabit does optimistic update, rolls back on failure
+    router.back();
+
     try {
-      const hours   = reminderDate.getHours().toString().padStart(2, "0");
-      const minutes = reminderDate.getMinutes().toString().padStart(2, "0");
-
-      await editHabit(id as string, {
-        title,
-        description,
-        reminderTime: `${hours}:${minutes}`,
-        frequency,
-        targetDays:   frequency === "custom" ? targetDays : [],
-        category,
-        color:        selectedColor,
-        icon:         selectedIcon,
-      });
-
-      router.back();
+      await editHabit(id as string, payload);
     } catch (error: any) {
       const responseData     = error.response?.data;
       const validationErrors = responseData?.errors;
@@ -136,7 +138,7 @@ export default function EditHabit() {
       } else if (responseData?.message) {
         errorMessage = responseData.message;
       }
-      showAlert("Action Required", errorMessage);
+      showAlert("Update Failed", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

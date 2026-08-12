@@ -32,6 +32,12 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [isOnline, setIsOnline] = useState(true);
   const { user } = useAuth();
+  
+  // Use a ref to keep track of current habits for optimistic rollbacks without closure lag
+  const habitsRef = useRef<Habit[]>(habits);
+  useEffect(() => {
+    habitsRef.current = habits;
+  }, [habits]);
 
   // Load cached habits initially for instant UI
   useEffect(() => {
@@ -53,19 +59,16 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const unsubscribe = setupNetworkListener(async () => {
       setIsOnline(true);
-      // Drain the offline queue silently
       try {
         await processOfflineQueue(habitService);
       } catch (e) {
         console.error('Failed to process offline queue', e);
       }
-      // Refetch fresh data from server
       if (user) {
         fetchHabits();
       }
     });
 
-    // Also check initial network state
     NetInfo.fetch().then(state => {
       setIsOnline(!!state.isConnected);
     });
@@ -101,22 +104,19 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
       const res = await habitService.getHabits();
       const fetchedHabits = res.habits || [];
       await updateAndCacheHabits(fetchedHabits);
-      await syncHabitReminders(fetchedHabits);
+      // Non-blocking notification sync in background
+      syncHabitReminders(fetchedHabits).catch(() => {});
     } catch (err) {
       console.error('Fetch Error:', err);
-      // If we have cached habits, we don't alert, just keep the cache
     } finally {
       setLoading(false);
     }
   };
 
   const addHabit = async (data: any) => {
-    // Check network connectivity
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      // Queue the action for later
       await addToOfflineQueue({ type: 'CREATE_HABIT', data });
-      // Show a local optimistic placeholder so the UI isn't blank
       const placeholderHabit: Habit = {
         _id: `offline_${Date.now()}`,
         title: data.title,
@@ -132,7 +132,7 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
         color: data.color,
         icon: data.icon,
       };
-      const newHabits = [...habits, placeholderHabit];
+      const newHabits = [...habitsRef.current, placeholderHabit];
       await updateAndCacheHabits(newHabits);
       showAlert(
         'Saved Offline',
@@ -143,33 +143,42 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const res = await habitService.createHabit(data);
-      const newHabits = [...habits, res.habit];
+      const newHabits = [...habitsRef.current, res.habit];
       await updateAndCacheHabits(newHabits);
-      await syncHabitReminders(newHabits);
+      // Non-blocking background notification sync
+      syncHabitReminders(newHabits).catch(() => {});
     } catch (error) {
       throw error;
     }
   };
 
   const editHabit = async (id: string, data: any) => {
+    // Optimistically update UI first
+    const previousHabits = [...habitsRef.current];
+    const optimisticHabits = previousHabits.map(h =>
+      h._id === id ? { ...h, ...data } : h
+    );
+    await updateAndCacheHabits(optimisticHabits);
+
     try {
       const res = await habitService.updateHabit(id, data);
-      const updatedHabits = habits.map(h => h._id === id ? res.habit : h);
+      const updatedHabits = habitsRef.current.map(h => h._id === id ? res.habit : h);
       await updateAndCacheHabits(updatedHabits);
-      await syncHabitReminders(updatedHabits);
+      syncHabitReminders(updatedHabits).catch(() => {});
     } catch (error) {
+      // Rollback on failure
+      await updateAndCacheHabits(previousHabits);
       throw error;
     }
   };
 
   const toggleComplete = async (id: string, isCurrentlyCompleted: boolean) => {
-    if (syncingIds.has(id)) return; // Prevent duplicate requests
+    if (syncingIds.has(id)) return;
 
     setSyncingIds(prev => new Set(prev).add(id));
 
-    // Optimistic update for "premium" feel
-    const originalHabits = [...habits];
-    const optimisticHabits = habits.map(h => {
+    const originalHabits = [...habitsRef.current];
+    const optimisticHabits = originalHabits.map(h => {
       if (h._id === id) {
         const today = new Date().toISOString();
         const newDates = isCurrentlyCompleted
@@ -182,18 +191,15 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
 
     setHabits(optimisticHabits);
 
-    // Check network before calling API
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      // Queue it for later — the optimistic UI update stays
       await addToOfflineQueue({
         type: isCurrentlyCompleted ? 'UNMARK_COMPLETE' : 'MARK_COMPLETE',
         habitId: id,
       });
-      // Persist the optimistic state to cache
       try {
         await storage.setItem(CACHE_KEY, JSON.stringify(optimisticHabits));
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
       setSyncingIds(prev => {
         const next = new Set(prev);
         next.delete(id);
@@ -207,12 +213,11 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
         ? await habitService.unmarkComplete(id)
         : await habitService.markComplete(id);
 
-      // Use the original habits array as the base to avoid stale closures
-      const updatedHabits = originalHabits.map(h => h._id === id ? res.habit : h);
+      const updatedHabits = habitsRef.current.map(h => h._id === id ? res.habit : h);
       await updateAndCacheHabits(updatedHabits);
     } catch (error) {
       console.error('Toggle Error:', error);
-      setHabits(originalHabits); // Rollback on error
+      setHabits(originalHabits);
       showAlert('Sync Failed', 'Could not update habit. Check your connection.');
     } finally {
       setSyncingIds(prev => {
@@ -224,14 +229,19 @@ export const HabitProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const deleteHabit = async (id: string) => {
+    // Optimistic deletion: instantly remove from screen
+    const previousHabits = [...habitsRef.current];
+    const newHabits = previousHabits.filter(h => h._id !== id);
+    await updateAndCacheHabits(newHabits);
+    syncHabitReminders(newHabits).catch(() => {});
+
     try {
       await habitService.deleteHabit(id);
-      const newHabits = habits.filter(h => h._id !== id);
-      await updateAndCacheHabits(newHabits);
-      await syncHabitReminders(newHabits);
     } catch (error) {
       console.error('Delete Error:', error);
-      showAlert('Delete Failed', 'Could not remove habit.');
+      // Rollback on failure
+      await updateAndCacheHabits(previousHabits);
+      showAlert('Delete Failed', 'Could not remove habit from server.');
     }
   };
 

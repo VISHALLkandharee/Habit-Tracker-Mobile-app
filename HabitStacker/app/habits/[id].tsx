@@ -24,9 +24,10 @@ export default function HabitDetails() {
     showConfirm(
       "Delete Habit",
       "All your progress for this habit will be lost forever. Proceed?",
-      async () => {
-        await deleteHabit(habit._id);
+      () => {
+        // Navigate first — HabitContext handles optimistic deletion & background sync
         router.back();
+        deleteHabit(habit._id).catch(() => {});
       }
     );
   };
@@ -57,7 +58,7 @@ export default function HabitDetails() {
         
         <View style={styles.headerContent}>
           <View style={styles.iconContainer}>
-             <Ionicons name="star" size={40} color="white" />
+             <Ionicons name={(habit.icon as any) || 'star'} size={40} color="white" />
           </View>
           <Text style={styles.title}>{habit.title}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>

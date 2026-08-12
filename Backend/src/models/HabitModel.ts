@@ -20,6 +20,7 @@ const habitSchema = new Schema<Habit>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true, // Fast query by user ID
     },
     icon: { type: String },
     color: { type: String },
@@ -56,5 +57,9 @@ const habitSchema = new Schema<Habit>(
   },
   { timestamps: true },
 );
+
+// Compound indexes for ultra-fast query performance
+habitSchema.index({ user: 1, status: 1 });
+habitSchema.index({ user: 1, createdAt: -1 });
 
 export const HabitModel = model<Habit>("Habit", habitSchema);

@@ -78,23 +78,25 @@ export default function AddHabit() {
     }
 
     setIsSubmitting(true);
+    const hours   = reminderDate.getHours().toString().padStart(2, "0");
+    const minutes = reminderDate.getMinutes().toString().padStart(2, "0");
+    const payload = {
+      title,
+      description,
+      status:       "active",
+      reminderTime: `${hours}:${minutes}`,
+      frequency,
+      targetDays:   frequency === "custom" ? targetDays : [],
+      category,
+      color:        selectedColor,
+      icon:         selectedIcon,
+    };
+
+    // Navigate immediately — HabitContext handles optimistic update & background sync
+    router.back();
+
     try {
-      const hours   = reminderDate.getHours().toString().padStart(2, "0");
-      const minutes = reminderDate.getMinutes().toString().padStart(2, "0");
-
-      await addHabit({
-        title,
-        description,
-        status:       "active",
-        reminderTime: `${hours}:${minutes}`,
-        frequency,
-        targetDays:   frequency === "custom" ? targetDays : [],
-        category,
-        color:        selectedColor,
-        icon:         selectedIcon,
-      });
-
-      router.back();
+      await addHabit(payload);
     } catch (error: any) {
       const responseData      = error.response?.data;
       const validationErrors  = responseData?.errors;
@@ -104,7 +106,7 @@ export default function AddHabit() {
       } else if (responseData?.message) {
         errorMessage = responseData.message;
       }
-      showAlert("Action Required", errorMessage);
+      showAlert("Habit Not Saved", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

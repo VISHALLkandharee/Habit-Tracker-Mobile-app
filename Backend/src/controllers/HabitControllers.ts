@@ -103,29 +103,29 @@ const updateHabit = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { title, description, status, reminderTime, icon, color, frequency, targetDays, category } = req.body;
 
-    const habit = await HabitModel.findOne({ user: userId, _id: id });
+    // Build update object dynamically — only include fields that were actually sent
+    const updates: Record<string, any> = {};
+    if (title)                    updates.title        = title;
+    if (description !== undefined) updates.description  = description;
+    if (status)                   updates.status       = status;
+    if (reminderTime !== undefined) updates.reminderTime = reminderTime;
+    if (icon)                     updates.icon         = icon;
+    if (color)                    updates.color        = color;
+    if (frequency)                updates.frequency    = frequency;
+    if (targetDays)               updates.targetDays   = targetDays;
+    if (category)                 updates.category     = category;
+
+    // Single atomic round-trip — much faster than findOne + save
+    const habit = await HabitModel.findOneAndUpdate(
+      { _id: id, user: userId },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
 
     if (!habit)
-      return res
-        .status(404)
-        .json({ message: "habit not found with the given id" });
+      return res.status(404).json({ message: "habit not found with the given id" });
 
-    if (title) habit.title = title;
-    if (description) habit.description = description;
-    if (status) habit.status = status;
-    if (reminderTime !== undefined) habit.reminderTime = reminderTime;
-    if (icon) habit.icon = icon;
-    if (color) habit.color = color;
-    if (frequency) habit.frequency = frequency;
-    if (targetDays) habit.targetDays = targetDays;
-    if (category) habit.category = category;
-
-    await habit.save();
-
-    res.status(200).json({
-      message: "habit updated successfully",
-      habit,
-    });
+    res.status(200).json({ message: "habit updated successfully", habit });
   } catch (error) {
     res.status(500).json({
       message: error || "Failed updating the habit due to server error",
@@ -202,29 +202,28 @@ const unMarkHabitComplete = async (req: Request, res: Response) => {
     if (!mongoose.Types.ObjectId.isValid(id as string))
       return res.status(400).json({ message: "invalid id" });
 
-    const habit = await HabitModel.findOne({ _id: id, user: userId });
-
-    if (!habit)
-      return res
-        .status(404)
-        .json({ message: "habit not found with the given id" });
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today.getTime() + 86400000);
 
-    habit.CompletedDates = habit.CompletedDates?.filter(
-      (date) => new Date(date).toDateString() !== today.toDateString(),
+    // Pull today's date in one atomic operation
+    const habit = await HabitModel.findOneAndUpdate(
+      { _id: id, user: userId },
+      { $pull: { CompletedDates: { $gte: today, $lt: tomorrow } } },
+      { new: true }
     );
 
-    habit.currentStreak = calculateStreak(habit.CompletedDates, habit.frequency, habit.targetDays);
+    if (!habit)
+      return res.status(404).json({ message: "habit not found with the given id" });
 
+    // Recalculate streak after pull
+    habit.currentStreak = calculateStreak(habit.CompletedDates, habit.frequency, habit.targetDays);
     await habit.save();
 
     res.status(200).json({ message: "habit unmark completed!", habit });
   } catch (error) {
     res.status(500).json({
-      message:
-        error || "Failed marking the habit as incomplete due to server error",
+      message: error || "Failed marking the habit as incomplete due to server error",
     });
   }
 };

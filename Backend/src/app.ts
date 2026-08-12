@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 
 // User Routes
 import AuthRoutes from "./routes/AuthRoutes";
@@ -11,8 +12,9 @@ import AchievementRoutes from "./routes/AchievementRoutes";
 
 const app = express();
 
-// Apply security middleware
+// Apply security + performance middleware
 app.use(helmet());
+app.use(compression()); // gzip all responses (reduces payload 60-80%)
 app.use(cors());
 
 // Middleware to parse JSON bodies

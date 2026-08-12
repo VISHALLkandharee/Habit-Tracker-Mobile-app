@@ -13,10 +13,8 @@ import { BlurView } from 'expo-blur';
 
 export default function Home() {
   const { habits, fetchHabits, toggleComplete, loading } = useHabits();
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
-
-  useEffect(() => { fetchHabits(); }, []);
 
   const completedCount = useMemo(() => 
     habits.filter(h => isCompletedToday(h.CompletedDates)).length,
@@ -56,7 +54,7 @@ export default function Home() {
     router.push(`/habits/${id}`);
   }, [router]);
 
-  const Header = () => (
+  const header = useMemo(() => (
     <LinearGradient
       colors={GRADIENTS.primary}
       start={{ x: 0, y: 0 }}
@@ -92,7 +90,7 @@ export default function Home() {
         ))}
       </View>
     </LinearGradient>
-  );
+  ), [user?.name, habits.length, completedCount, weekDays]);
 
   const renderHabitItem = React.useCallback(({ item }: { item: any }) => (
     <HabitCard 
@@ -128,7 +126,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <Header />
+      {header}
       
       <View style={styles.listContainer}>
         <View style={styles.sectionHeader}>
