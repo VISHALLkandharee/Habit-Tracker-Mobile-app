@@ -1,68 +1,91 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// Configure how notifications should be handled when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  } as any),
-});
+// In Expo SDK 53+, remote push notification listeners in expo-notifications
+// were removed from Expo Go. Checking if running in Expo Go allows us to
+// gracefully skip notification side-effects in Expo Go while keeping full
+// notification functionality in standalone / development builds (EAS builds).
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-export async function requestNotificationPermissions() {
-  if (Platform.OS === 'web') return false;
+let Notifications: any = null;
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
+if (!isExpoGo && Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (e) {
+    console.warn('[Notifications] Failed to initialize notifications handler:', e);
   }
-  
-  if (finalStatus !== 'granted') {
+}
+
+export async function requestNotificationPermissions(): Promise<boolean> {
+  if (Platform.OS === 'web' || isExpoGo || !Notifications) return false;
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    return finalStatus === 'granted';
+  } catch (e) {
+    console.warn('[Notifications] Error requesting permissions:', e);
     return false;
   }
-  
-  return true;
 }
 
-export async function cancelAllReminders() {
-  if (Platform.OS !== 'web') {
+export async function cancelAllReminders(): Promise<void> {
+  if (Platform.OS === 'web' || isExpoGo || !Notifications) return;
+
+  try {
     await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (e) {
+    console.warn('[Notifications] Error canceling reminders:', e);
   }
 }
 
-export async function syncHabitReminders(habits: any[]) {
-  if (Platform.OS === 'web') return;
+export async function syncHabitReminders(habits: any[]): Promise<void> {
+  if (Platform.OS === 'web' || isExpoGo || !Notifications) return;
 
-  const hasPermission = await requestNotificationPermissions();
-  if (!hasPermission) return;
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) return;
 
-  // Clear all existing to prevent duplicates or orphaned reminders
-  await cancelAllReminders();
+    // Clear all existing to prevent duplicates
+    await cancelAllReminders();
 
-  for (const habit of habits) {
-    if (habit.status === 'active' && habit.reminderTime) {
-      const [hourStr, minuteStr] = habit.reminderTime.split(':');
-      const hour = parseInt(hourStr, 10);
-      const minute = parseInt(minuteStr, 10);
+    for (const habit of habits) {
+      if (habit.status === 'active' && habit.reminderTime) {
+        const [hourStr, minuteStr] = habit.reminderTime.split(':');
+        const hour = parseInt(hourStr, 10);
+        const minute = parseInt(minuteStr, 10);
 
-      if (!isNaN(hour) && !isNaN(minute)) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: `Time for: ${habit.title} 🚀`,
-            body: "Don't break your streak! Take a few minutes to complete your habit now.",
-            sound: true,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DAILY,
-            hour: hour,
-            minute: minute,
-          },
-        });
+        if (!isNaN(hour) && !isNaN(minute)) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: `Time for: ${habit.title} 🚀`,
+              body: "Don't break your streak! Take a few minutes to complete your habit now.",
+              sound: true,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour,
+              minute,
+            },
+          });
+        }
       }
     }
+  } catch (e) {
+    console.warn('[Notifications] Error syncing reminders:', e);
   }
 }
