@@ -13,7 +13,7 @@ const habitSchema = new Schema<Habit>(
     },
     status: {
       type: String,
-      enum: ["active", "maintenance"],
+      enum: ["active", "maintenance", "compromised"],
       default: "active",
     },
     user: {
@@ -26,6 +26,19 @@ const habitSchema = new Schema<Habit>(
     reminderTime: {
       type: String,
       default: null,
+    },
+    frequency: {
+      type: String,
+      enum: ["daily", "weekly", "custom"],
+      default: "daily",
+    },
+    targetDays: {
+      type: [String],
+      default: [],
+    },
+    category: {
+      type: String,
+      default: "General",
     },
     currentStreak: {
       type: Number,

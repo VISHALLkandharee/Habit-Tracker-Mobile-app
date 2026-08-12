@@ -14,6 +14,12 @@ export const habitService = {
     return response.data;
   },
 
+  // PUT /api/habits/:id
+  updateHabit: async (id: string, data: Partial<Habit>): Promise<HabitResponse> => {
+    const response = await apiClient.put(`/habits/${id}`, data);
+    return response.data;
+  },
+
   // PATCH /api/habits/:id/complete
   markComplete: async (id: string): Promise<HabitResponse> => {
     const response = await apiClient.patch(`/habits/${id}/complete`);
@@ -29,6 +35,30 @@ export const habitService = {
   // DELETE /api/habits/:id
   deleteHabit: async (id: string): Promise<any> => {
     const response = await apiClient.delete(`/habits/${id}`);
+    return response.data;
+  },
+
+  // GET /api/analytics
+  getAnalytics: async (): Promise<any> => {
+    const response = await apiClient.get("/analytics");
+    return response.data;
+  },
+
+  // GET /api/achievements
+  getAchievements: async (): Promise<any> => {
+    const response = await apiClient.get("/achievements");
+    return response.data;
+  },
+
+  // GET /api/community/leaderboard
+  getLeaderboard: async (): Promise<any> => {
+    const response = await apiClient.get("/community/leaderboard");
+    return response.data;
+  },
+
+  // GET /api/community/pulse
+  getPulse: async (): Promise<any> => {
+    const response = await apiClient.get("/community/pulse");
     return response.data;
   },
 };

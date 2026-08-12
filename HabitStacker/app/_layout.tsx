@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { HabitProvider } from '../src/context/HabitContext';
 import { ActivityIndicator, View } from 'react-native';
+import '../src/utils/notifications';
 
 function RootNavigation() {
   const { user, isLoading } = useAuth();

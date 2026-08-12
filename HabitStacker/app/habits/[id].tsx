@@ -1,71 +1,279 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusBar } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useHabits } from '../../src/context/HabitContext';
-import { COLORS } from '../../src/constants/Config';
+import { COLORS, SHADOWS, GRADIENTS } from '../../src/constants/Config';
 import { Ionicons } from '@expo/vector-icons';
+import { showConfirm } from '../../src/utils/ui';
+import { LinearGradient } from 'expo-linear-gradient';
+import { isCompletedToday } from '../../src/utils/dateUtils';
 
 export default function HabitDetails() {
   const { id } = useLocalSearchParams();
-  const { habits, deleteHabit } = useHabits();
+  const { habits, deleteHabit, toggleComplete } = useHabits();
   const router = useRouter();
   
-  const habit = habits.find(h => h._id === id);
+  const habit = useMemo(() => habits.find(h => h._id === id), [habits, id]);
 
   if (!habit) return null;
 
+  const isDoneToday = isCompletedToday(habit.CompletedDates);
+  const habitColor = habit.color || COLORS.primary;
+
   const handleDelete = () => {
-    Alert.alert("Delete Habit", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-          await deleteHabit(habit._id);
-          router.back();
-      }}
-    ]);
+    showConfirm(
+      "Delete Habit",
+      "All your progress for this habit will be lost forever. Proceed?",
+      async () => {
+        await deleteHabit(habit._id);
+        router.back();
+      }
+    );
+  };
+
+  const handleToggle = () => {
+    toggleComplete(habit._id, isDoneToday);
   };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { backgroundColor: habit.color || COLORS.primary }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={28} color="white" />
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header Section */}
+      <LinearGradient colors={[habitColor, habitColor + 'DD']} style={styles.header}>
+        <View style={styles.navBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.navBtn}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity onPress={() => router.push(`/habits/edit?id=${habit._id}`)} style={styles.navBtn}>
+              <Ionicons name="pencil-outline" size={22} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDelete} style={styles.navBtn}>
+              <Ionicons name="trash-outline" size={22} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.headerContent}>
+          <View style={styles.iconContainer}>
+             <Ionicons name="star" size={40} color="white" />
+          </View>
+          <Text style={styles.title}>{habit.title}</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>{habit.status.toUpperCase()}</Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
+              <Text style={styles.statusText}>{(habit.category || 'General').toUpperCase()}</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, SHADOWS.sm]}>
+            <Ionicons name="flame" size={24} color="#f59e0b" />
+            <Text style={styles.statValue}>{habit.currentStreak}</Text>
+            <Text style={styles.statLabel}>Current Streak</Text>
+          </View>
+          <View style={[styles.statCard, SHADOWS.sm]}>
+            <Ionicons name="trophy" size={24} color="#fbbf24" />
+            <Text style={styles.statValue}>{habit.longestStreak}</Text>
+            <Text style={styles.statLabel}>Best Streak</Text>
+          </View>
+        </View>
+
+        {/* Info Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Goal Description</Text>
+          <View style={styles.descriptionCard}>
+            <Text style={styles.desc}>
+              {habit.description || "No description provided. Keep pushing forward!"}
+            </Text>
+          </View>
+        </View>
+
+        {/* Reminder Section */}
+        <View style={styles.section}>
+           <View style={styles.reminderCard}>
+             <Ionicons name="notifications" size={20} color={COLORS.primary} />
+             <Text style={styles.reminderText}>
+               {habit.frequency ? habit.frequency.charAt(0).toUpperCase() + habit.frequency.slice(1) : 'Daily'} reminder at {habit.reminderTime || '08:00 AM'}
+             </Text>
+           </View>
+        </View>
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
+
+      {/* Fixed Action Button */}
+      <View style={styles.actionContainer}>
+         <TouchableOpacity 
+          activeOpacity={0.9} 
+          style={[styles.completeBtn, SHADOWS.md]}
+          onPress={handleToggle}
+        >
+          <LinearGradient 
+            colors={isDoneToday ? GRADIENTS.success : [habitColor, habitColor]} 
+            style={styles.completeGradient}
+          >
+            <Ionicons 
+              name={isDoneToday ? "checkmark-circle" : "ellipse-outline"} 
+              size={24} 
+              color="white" 
+            />
+            <Text style={styles.completeText}>
+              {isDoneToday ? "Completed Today" : "Mark as Complete"}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
-        <Text style={styles.title}>{habit.title}</Text>
       </View>
-
-      <View style={styles.statsCard}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Current Streak</Text>
-          <Text style={styles.statValue}>{habit.currentStreak} Days</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Best Streak</Text>
-          <Text style={styles.statValue}>{habit.longestStreak} Days</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Description</Text>
-      <Text style={styles.desc}>{habit.description || "No description provided."}</Text>
-
-      <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-        <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-        <Text style={styles.deleteText}>Delete Habit</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { height: 200, justifyContent: 'center', alignItems: 'center', paddingTop: 40 },
-  backBtn: { position: 'absolute', top: 50, left: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', color: 'white' },
-  statsCard: { flexDirection: 'row', backgroundColor: 'white', margin: 20, borderRadius: 12, padding: 20, marginTop: -30, elevation: 4 },
-  stat: { flex: 1, alignItems: 'center' },
-  statLabel: { fontSize: 12, color: COLORS.gray, textTransform: 'uppercase' },
-  statValue: { fontSize: 20, fontWeight: 'bold', color: COLORS.text, marginTop: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginLeft: 20, marginTop: 20 },
-  desc: { fontSize: 16, color: COLORS.gray, margin: 20, lineHeight: 24 },
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', marginBottom: 40 },
-  deleteText: { color: COLORS.error, fontWeight: '600', marginLeft: 8 }
+  header: { 
+    height: 300, 
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+  },
+  navBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  navBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerContent: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    color: 'white',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  statusBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  content: { 
+    flex: 1, 
+    marginTop: -40,
+    paddingHorizontal: 20,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 20,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  descriptionCard: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border + '50',
+  },
+  desc: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    lineHeight: 24,
+  },
+  reminderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '08',
+    padding: 16,
+    borderRadius: 20,
+    gap: 12,
+  },
+  reminderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  actionContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+  },
+  completeBtn: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  completeGradient: {
+    flexDirection: 'row',
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  completeText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  }
 });

@@ -1,8 +1,10 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS } from "../constants/Config";
+import React, { memo, useMemo } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import { COLORS, SHADOWS } from "../constants/Config";
 import { Ionicons } from "@expo/vector-icons";
 import { Habit } from "../types/api";
+import { isCompletedToday as checkIsCompletedToday } from "../utils/dateUtils";
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   habit: Habit;
@@ -10,68 +12,157 @@ interface Props {
   onPress: () => void;
 }
 
-export const HabitCard = ({ habit, onToggle, onPress }: Props) => {
-  const isCompletedToday = habit.CompletedDates.some(
-    (date) => new Date(date).toDateString() === new Date().toDateString(),
+export const HabitCard = memo(({ habit, onToggle, onPress }: Props) => {
+  const isCompletedToday = useMemo(() =>
+    checkIsCompletedToday(habit.CompletedDates),
+    [habit.CompletedDates]
   );
 
+  const habitColor = habit.color || COLORS.primary;
+  const habitIcon  = (habit.icon as any) || "star-outline";
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <View
-        style={[
-          styles.statusLine,
-          { backgroundColor: habit.color || COLORS.primary },
-        ]}
-      />
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={[styles.card, SHADOWS.sm]}
+      onPress={onPress}
+    >
+      {/* Left accent bar */}
+      <View style={[styles.statusLine, { backgroundColor: habitColor }]} />
+
+      {/* Icon badge */}
+      <View style={[styles.iconBadge, { backgroundColor: habitColor + '18' }]}>
+        <Ionicons name={habitIcon} size={20} color={habitColor} />
+      </View>
+
+      {/* Text content */}
       <View style={styles.content}>
-        <Text style={styles.title}>{habit.title}</Text>
-        <View style={styles.streakRow}>
-          <Ionicons name="flame" size={16} color="#f59e0b" />
-          <Text style={styles.streakText}>
-            {habit.currentStreak} day streak
-          </Text>
+        <Text style={styles.title} numberOfLines={1}>{habit.title}</Text>
+        <View style={styles.metaRow}>
+          {/* Streak pill */}
+          <LinearGradient
+            colors={['#f59e0b', '#d97706']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.flameBadge}
+          >
+            <Ionicons name="flame" size={11} color="#fff" />
+            <Text style={styles.streakText}>{habit.currentStreak}d</Text>
+          </LinearGradient>
+
+          {/* Category pill */}
+          {habit.category ? (
+            <View style={styles.categoryPill}>
+              <Text style={styles.categoryText}>{habit.category}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
+
+      {/* Checkbox */}
       <TouchableOpacity
-        style={[
-          styles.checkbox,
-          isCompletedToday && {
-            backgroundColor: habit.color || COLORS.primary,
-          },
-        ]}
+        activeOpacity={0.8}
         onPress={onToggle}
+        style={styles.checkboxWrapper}
       >
-        {isCompletedToday && (
-          <Ionicons name="checkmark" size={20} color="white" />
+        {isCompletedToday ? (
+          <LinearGradient
+            colors={[habitColor, habitColor + 'CC']}
+            style={styles.checkboxActive}
+          >
+            <Ionicons name="checkmark" size={18} color="white" />
+          </LinearGradient>
+        ) : (
+          <View style={[styles.checkboxInactive, { borderColor: habitColor + '60' }]} />
         )}
       </TouchableOpacity>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 18,
+    marginBottom: 14,
     alignItems: "center",
     overflow: "hidden",
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Platform.OS === 'ios' ? 'transparent' : COLORS.border + '20',
   },
-  statusLine: { width: 6, height: "100%" },
-  content: { flex: 1, padding: 16 },
-  title: { fontSize: 16, fontWeight: "bold", color: COLORS.text },
-  streakRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
-  streakText: { fontSize: 14, color: COLORS.gray, marginLeft: 4 },
-  checkbox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#e2e8f0",
-    marginRight: 16,
+  statusLine: {
+    width: 5,
+    height: "100%",
+    opacity: 0.85,
+  },
+  iconBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: 12,
+  },
+  content: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingLeft: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.text,
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  flameBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 3,
+  },
+  streakText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  categoryPill: {
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  checkboxWrapper: {
+    padding: 16,
+  },
+  checkboxActive: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    ...SHADOWS.md,
+  },
+  checkboxInactive: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: COLORS.background,
   },
 });

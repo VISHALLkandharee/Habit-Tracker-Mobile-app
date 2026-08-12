@@ -25,6 +25,6 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.email({message:"enter a valid email!"}),
+  email: z.string().email({message:"enter a valid email!"}),
   password: z.string().min(1),
 });

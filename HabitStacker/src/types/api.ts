@@ -1,5 +1,5 @@
 export interface User {
-  _id: string;
+  id: string;
   name: string;
   email: string;
   avatar?: string;
@@ -9,20 +9,49 @@ export interface User {
 export interface Habit {
   _id: string;
   title: string;
-  description?: string; // Optional in your model
-  status: 'active' | 'maintenance';
+  description?: string;
+  status: 'active' | 'maintenance' | 'compromised';
   currentStreak: number;
   longestStreak: number;
   reminderTime?: string | null;
-  CompletedDates: string[]; // Dates come as strings from JSON
-  color?: string; // Your model has it, but controller ignores it (we'll keep it in type)
+  frequency: 'daily' | 'weekly' | 'custom';
+  targetDays: string[];
+  category: string;
+  CompletedDates: string[];
+  color?: string;
   icon?: string;
+}
+
+export interface Achievement {
+  _id: string;
+  title: string;
+  description: string;
+  icon: string;
+  type: 'streak' | 'total' | 'early_bird' | 'stacker';
+  unlockedAt: string;
+}
+
+export interface Analytics {
+  summary: {
+    totalHabits: number;
+    overallCompletionRate: number;
+    totalCompletions: number;
+  };
+  categories: string[];
+  habits: {
+    id: string;
+    title: string;
+    streak: number;
+    best: number;
+    completionRate: number;
+  }[];
 }
 
 export interface AuthResponse {
   message: string;
   user: User;
   token: string;
+  refreshToken: string;
 }
 
 export interface HabitResponse {

@@ -5,45 +5,41 @@ import { Request, Response, NextFunction } from "express";
 const createHabitSchema = z.object({
   title: z
     .string()
-    .min(5, { message: "Title must be at least 5 characters" })
+    .min(3, { message: "Title must be at least 3 characters" })
     .max(100, { message: "Title must be at most 100 characters" }),
   description: z
     .string()
-    .min(5, { message: "Description must be at least 5 characters" })
-    .max(500, { message: "Description must be at most 500 characters" }),
-  status: z.enum(["active", "compromised"], {
-    message: "Status must be either 'active' or 'compromised'",
-  }),
+    .max(500, { message: "Description must be at most 500 characters" })
+    .optional()
+    .or(z.literal('')),
+  status: z.enum(["active", "maintenance", "compromised"], {
+    message: "Status must be 'active', 'maintenance', or 'compromised'",
+  }).default("active"),
   reminderTime: z
     .string()
     .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
       message: "Reminder time must be in HH:mm format (24-hour)",
-    }),
+    })
+    .optional()
+    .or(z.literal('')),
+  icon: z.string().optional(),
+  color: z.string().optional(),
+  frequency: z.enum(["daily", "weekly", "custom"]).default("daily"),
+  targetDays: z.array(z.string()).optional().default([]),
+  category: z.string().optional().default("General"),
 });
 
-// Schema for updating a habit (all fields optional)
+// Schema for updating a habit (all fields optional, no defaults to prevent overwriting)
 const updateHabitSchema = z.object({
-  title: z
-    .string()
-    .min(5, { message: "Title must be at least 5 characters" })
-    .max(100, { message: "Title must be at most 100 characters" })
-    .optional(),
-  description: z
-    .string()
-    .min(5, { message: "Description must be at least 5 characters" })
-    .max(500, { message: "Description must be at most 500 characters" })
-    .optional(),
-  status: z
-    .enum(["active", "compromised"], {
-      message: "Status must be either 'active' or 'compromised'",
-    })
-    .optional(),
-  reminderTime: z
-    .string()
-    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-      message: "Reminder time must be in HH:mm format (24-hour)",
-    })
-    .optional(),
+  title: z.string().min(3).max(100).optional(),
+  description: z.string().max(500).optional().or(z.literal('')),
+  status: z.enum(["active", "maintenance", "compromised"]).optional(),
+  reminderTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional().or(z.literal('')),
+  icon: z.string().optional(),
+  color: z.string().optional(),
+  frequency: z.enum(["daily", "weekly", "custom"]).optional(),
+  targetDays: z.array(z.string()).optional(),
+  category: z.string().optional(),
 });
 
 // Validation middleware for creating habits

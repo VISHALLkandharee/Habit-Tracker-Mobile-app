@@ -5,6 +5,9 @@ import helmet from "helmet";
 // User Routes
 import AuthRoutes from "./routes/AuthRoutes";
 import HabitRoutes from "./routes/HabitRoutes";
+import AnalyticsRoutes from "./routes/AnalyticsRoutes";
+import CommunityRoutes from "./routes/CommunityRoutes";
+import AchievementRoutes from "./routes/AchievementRoutes";
 
 const app = express();
 
@@ -22,5 +25,8 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", AuthRoutes);
 app.use("/api/habits", HabitRoutes);
+app.use("/api/analytics", AnalyticsRoutes);
+app.use("/api/community", CommunityRoutes);
+app.use("/api/achievements", AchievementRoutes);
 
 export default app;

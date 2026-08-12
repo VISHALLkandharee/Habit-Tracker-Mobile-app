@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { HabitModel } from "../models/HabitModel";
+import { checkAchievements } from "../utils/achievementEngine";
 
 import type { Request, Response } from "express";
 
@@ -7,12 +8,13 @@ const getAllHabits = async (req: Request, res: Response) => {
   const userId = (req as any).user.userId;
 
   try {
-    const { status, title } = req.query;
+    const { status, title, category } = req.query;
 
     const filter: any = { user: userId };
 
     if (status) filter.status = status;
     if (title) filter.title = { $regex: title, $options: "i" };
+    if (category) filter.category = category;
 
     const allHabits = await HabitModel.find(filter);
 
@@ -33,7 +35,7 @@ const getAllHabits = async (req: Request, res: Response) => {
 const createHabit = async (req: Request, res: Response) => {
   const userId = (req as any).user.userId;
   try {
-    const { title, description, status, reminderTime } = req.body;
+    const { title, description, status, reminderTime, icon, color, frequency, targetDays, category } = req.body;
 
     const habitsCount = await HabitModel.countDocuments({
       user: userId,
@@ -51,6 +53,11 @@ const createHabit = async (req: Request, res: Response) => {
       description,
       status,
       reminderTime,
+      icon,
+      color,
+      frequency,
+      targetDays,
+      category,
       user: userId,
     });
 
@@ -94,7 +101,7 @@ const updateHabit = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.userId;
     const { id } = req.params;
-    const { title, description, status, reminderTime } = req.body;
+    const { title, description, status, reminderTime, icon, color, frequency, targetDays, category } = req.body;
 
     const habit = await HabitModel.findOne({ user: userId, _id: id });
 
@@ -107,6 +114,11 @@ const updateHabit = async (req: Request, res: Response) => {
     if (description) habit.description = description;
     if (status) habit.status = status;
     if (reminderTime !== undefined) habit.reminderTime = reminderTime;
+    if (icon) habit.icon = icon;
+    if (color) habit.color = color;
+    if (frequency) habit.frequency = frequency;
+    if (targetDays) habit.targetDays = targetDays;
+    if (category) habit.category = category;
 
     await habit.save();
 
@@ -141,7 +153,7 @@ const markHabitComplete = async (req: Request, res: Response) => {
     today.setHours(0, 0, 0, 0);
 
     const isCompletedForToday = habit.CompletedDates?.some(
-      (date) => date.toDateString() === today.toDateString(),
+      (date) => new Date(date).toDateString() === today.toDateString(),
     );
 
     if (isCompletedForToday) {
@@ -152,7 +164,7 @@ const markHabitComplete = async (req: Request, res: Response) => {
 
     habit.CompletedDates?.push(today);
 
-    habit.currentStreak = calculateStreak(habit.CompletedDates);
+    habit.currentStreak = calculateStreak(habit.CompletedDates, habit.frequency, habit.targetDays);
 
     if (habit.currentStreak > habit.longestStreak!) {
       habit.longestStreak = habit.currentStreak;
@@ -163,6 +175,9 @@ const markHabitComplete = async (req: Request, res: Response) => {
     }
 
     await habit.save();
+
+    // Check for achievements (Point #4)
+    checkAchievements(userId, habit).catch(e => console.error("Achievement trigger failed", e));
 
     res.status(200).json({
       message:
@@ -198,10 +213,10 @@ const unMarkHabitComplete = async (req: Request, res: Response) => {
     today.setHours(0, 0, 0, 0);
 
     habit.CompletedDates = habit.CompletedDates?.filter(
-      (date) => date.toDateString() !== today.toDateString(),
+      (date) => new Date(date).toDateString() !== today.toDateString(),
     );
 
-    habit.currentStreak = calculateStreak(habit.CompletedDates);
+    habit.currentStreak = calculateStreak(habit.CompletedDates, habit.frequency, habit.targetDays);
 
     await habit.save();
 
@@ -237,6 +252,17 @@ const deleteHabit = async (req: Request, res: Response) => {
   }
 };
 
+const getAchievements = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { AchievementModel } = require("../models/AchievementModel");
+    const achievements = await AchievementModel.find({ user: userId }).sort({ unlockedAt: -1 });
+    res.status(200).json(achievements);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch achievements" });
+  }
+};
+
 export {
   getAllHabits,
   createHabit,
@@ -245,35 +271,51 @@ export {
   markHabitComplete,
   unMarkHabitComplete,
   deleteHabit,
+  getAchievements,
 };
 
-// Logcic For calculating straek
-function calculateStreak(completedDates: Date[] = []) {
+// Logic For calculating streak (Frequency Aware)
+function calculateStreak(completedDates: Date[] = [], frequency: string = 'daily', targetDays: string[] = []) {
   if (completedDates.length === 0) return 0;
 
-  // Sort dates in descending order
+  // Normalize and sort dates in descending order (newest first)
   const sortedDates = completedDates
     .map((d) => new Date(d).setHours(0, 0, 0, 0))
     .sort((a, b) => b - a);
 
   const today = new Date().setHours(0, 0, 0, 0);
-  const yesterday = today - 86400000; // 24 hours in ms
-
-  // Check if completed today or yesterday
-  if (sortedDates[0] !== today && sortedDates[0] !== yesterday) {
-    return 0; // Streak broken
+  
+  // 1. Check if the streak is broken (hasn't been touched in too long)
+  const lastCompleted = sortedDates[0];
+  
+  if (frequency === 'daily') {
+    if (lastCompleted < today - 86400000 && lastCompleted !== today) return 0;
+  } else {
+    // For weekly/custom, if the last completion was more than 8 days ago, it's definitely broken
+    if (today - lastCompleted > 86400000 * 8) return 0;
   }
 
   let streak = 0;
-  let expectedDate = today;
+  let currentDate = today;
 
-  for (const date of sortedDates) {
-    if (date === expectedDate || date === expectedDate - 86400000) {
-      streak++;
-      expectedDate = date - 86400000;
-    } else {
-      break;
+  // Simple and robust approach: count consecutive entries in sortedDates
+  // For v2.0, we count "Consecutive Successful Occurrences"
+  if (frequency === 'daily') {
+    // Start from the most recent completion, not necessarily today.
+    // This correctly handles: completed yesterday (not today) = streak stays alive
+    let expected = sortedDates[0];
+    for (const date of sortedDates) {
+      if (date === expected) {
+        streak++;
+        expected -= 86400000;
+      } else {
+        break;
+      }
     }
+  } else {
+      // For Weekly/Custom, we simply count total completions as long as they aren't "too far apart"
+      // This is a common pattern in habit apps to avoid complex day-of-week logic bugs
+      streak = sortedDates.length;
   }
 
   return streak;

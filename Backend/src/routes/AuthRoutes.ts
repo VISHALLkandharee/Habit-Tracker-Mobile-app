@@ -3,7 +3,9 @@ import {
   registerUser,
   loginUser,
   getUserProfile,
-  getAllUsers
+  getAllUsers,
+  refreshAccessToken,
+  logoutUser,
 } from "../controllers/AuthControllers.js";
 
 //middlewares
@@ -33,5 +35,7 @@ router.post(
 );
 router.post("/login", authLimitter, validateRequest(loginSchema), loginUser);
 router.get("/me", protectUser, getUserProfile);
+router.post("/logout", protectUser, logoutUser);
+router.post("/refresh-token", refreshAccessToken);
 
 export default router;

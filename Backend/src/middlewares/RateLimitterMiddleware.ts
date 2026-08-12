@@ -13,12 +13,12 @@ export const authLimitter = rateLimit({
 });
 
 
-export const generalLimitter = rateLimit({
-  windowMs: 60 * 1000, //1 min
-  max: 200,
-    message: {
+export const habitLimitter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 mins
+  max: 300, // Reasonable limit for checking habits
+  message: {
     success: false,
-    error: "Too many request! try again later...",
+    error: "Slow down! You're updating habits too quickly.",
   },
   standardHeaders: true,
   legacyHeaders: false,

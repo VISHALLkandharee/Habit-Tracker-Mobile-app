@@ -15,5 +15,14 @@ export const authService = {
   getMe: async (): Promise<{ user: User }> => {
     const response = await apiClient.get('/auth/me');
     return response.data;
+  },
+
+  refresh: async (refreshToken: string): Promise<AuthResponse> => {
+    const response = await apiClient.post('/auth/refresh-token', { refreshToken });
+    return response.data;
+  },
+
+  logout: async (): Promise<void> => {
+    await apiClient.post('/auth/logout');
   }
 };
