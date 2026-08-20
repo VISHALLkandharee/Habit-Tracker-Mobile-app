@@ -17,8 +17,6 @@ function protectUser(req: Request, res: Response, next: NextFunction) {
         .status(401)
         .json({ message: "Invalid token, authorization denied" });
 
-    console.log("Decoded Token in AuthMiddleware:", decoded);
-
     (req as any).user = decoded;
     next();
   } catch (error) {
