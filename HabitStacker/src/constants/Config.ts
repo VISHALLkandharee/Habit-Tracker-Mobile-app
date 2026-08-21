@@ -1,12 +1,17 @@
 import Constants from 'expo-constants';
 
-// Automatically extract the host IP address from Expo bundler connection
-// so mobile devices on Wi-Fi connect to the backend without manual IP edits.
+// Local development Metro host IP extraction
 const hostUri = Constants.expoConfig?.hostUri || (Constants as any).developerLauncher?.manifest?.debuggerHost;
 const hostIp = hostUri ? hostUri.split(':')[0] : '192.168.10.18';
 
+// Production API URL for deployed backend (Railway / Cloud)
+// Replace this with your Railway generated domain once deployed:
+export const PROD_API_URL = 'https://YOUR_RAILWAY_APP.up.railway.app/api';
+
 export const CONFIG = {
-  BASE_URL: `http://${hostIp}:8000/api`,
+  // In development mode (__DEV__), connects to your local machine.
+  // In production builds (EAS preview/production), connects to your live HTTPS server.
+  BASE_URL: __DEV__ ? `http://${hostIp}:8000/api` : PROD_API_URL,
   TOKEN_KEY: 'user_auth_token',
   REFRESH_TOKEN_KEY: 'user_refresh_token',
 };

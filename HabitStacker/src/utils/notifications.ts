@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// In Expo SDK 53+, remote push notification listeners in expo-notifications
-// were removed from Expo Go. Checking if running in Expo Go allows us to
-// gracefully skip notification side-effects in Expo Go while keeping full
-// notification functionality in standalone / development builds (EAS builds).
+// In Expo SDK 53+, remote push token auto-registration in expo-notifications
+// was removed from Expo Go. Checking if running in Expo Go allows us to
+// gracefully skip notification side-effects in Expo Go while providing full
+// native scheduled notifications in standalone / EAS production builds.
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 let Notifications: any = null;
@@ -19,6 +19,17 @@ if (!isExpoGo && Platform.OS !== 'web') {
         shouldSetBadge: false,
       }),
     });
+
+    // Create high-importance notification channel for Android 8.0+
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('habit-reminders', {
+        name: 'Habit Reminders',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#6366f1',
+        sound: 'default',
+      }).catch((e: any) => console.warn('[Notifications] Failed to create channel:', e));
+    }
   } catch (e) {
     console.warn('[Notifications] Failed to initialize notifications handler:', e);
   }
@@ -74,7 +85,8 @@ export async function syncHabitReminders(habits: any[]): Promise<void> {
             content: {
               title: `Time for: ${habit.title} 🚀`,
               body: "Don't break your streak! Take a few minutes to complete your habit now.",
-              sound: true,
+              sound: 'default',
+              channelId: 'habit-reminders',
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DAILY,
