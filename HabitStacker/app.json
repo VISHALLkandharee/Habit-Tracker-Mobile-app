@@ -24,6 +24,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.vishallk.habitstacker",
+      "versionCode": 1,
       "usesCleartextTraffic": true
     },
     "web": {
