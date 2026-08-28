@@ -3,7 +3,6 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 
-// User Routes
 import AuthRoutes from "./routes/AuthRoutes";
 import HabitRoutes from "./routes/HabitRoutes";
 import AnalyticsRoutes from "./routes/AnalyticsRoutes";
@@ -11,6 +10,9 @@ import CommunityRoutes from "./routes/CommunityRoutes";
 import AchievementRoutes from "./routes/AchievementRoutes";
 
 const app = express();
+
+// Enable trust proxy (resolves express-rate-limit X-Forwarded-For validation error behind proxies/Docker/hosting platforms)
+app.set("trust proxy", 1);
 
 // Apply security + performance middleware
 app.use(helmet());
