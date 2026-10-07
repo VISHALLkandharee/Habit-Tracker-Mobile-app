@@ -6,7 +6,7 @@ const hostIp = hostUri ? hostUri.split(':')[0] : '192.168.10.18';
 
 // Production API URL for deployed backend (Railway / Cloud)
 // Production API URL for deployed backend (Railway)
-export const PROD_API_URL = 'https://habit-tracker-mobile-app-production.up.railway.app/api';
+export const PROD_API_URL = 'https://habit-tracker-mobile-app-production-4647.up.railway.app/api';
 
 export const CONFIG = {
   // In development mode (__DEV__), connects to your local machine.
